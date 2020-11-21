@@ -7,7 +7,7 @@ import requests
 
 from hbl4z import HueBusyLightForZoom
 
-# to hide the console you need to add the --noconsole to your pyinstaller command.
+# pyinstaller --onefile --noconsole Hue_Busy_Light_for_Zoom_gui.py
 
 
 class PrintLogger:  # create file like object
