@@ -30,8 +30,6 @@ class HueBusyLightForZoom():
         self.app_settings['hue_light_id'] = get_reg('hue_light_id')   # Light ID number for the light you want to use as your Zoom busy light       
         self.app_settings['hue_username'] = get_reg('hue_username')   # Hue bridge username, see https://developers.meethue.com/develop/get-started-2/
         self.app_settings['hue_bridge_ip'] = get_reg('hue_bridge_ip') # IP address of bridge, don't know this... goto https://discovery.meethue.com
-            
-
         self.app_settings['zoom_busy_color'] = [0.67, 0.30] # This is a 'xy' color for the Zoom "red" color
         self.app_settings['zoom_busy_brightness_level'] = 125 # this is the brightness of the Zoom busy light, Hue uses the range 0 - 255
 
@@ -69,24 +67,7 @@ class HueBusyLightForZoom():
             return hue_light_current_state, False
         else:
             return None, False
-
-
-    def turn_on_hue_zoom_busy_light(self):
-        # turn on the light
-        try:
-            response = requests.put(url = f"http://{self.app_settings['hue_bridge_ip']}/api/{self.app_settings['hue_username']}/lights/{self.app_settings['hue_light_id']}/state", json={"on":True, "xy":self.app_settings['zoom_busy_color'] , "bri": self.app_settings['zoom_busy_brightness_level']})
-        except Exception as e:
-            print(f"Unable to turn on light due to error {e}")
-
-        if response.status_code==200:
-            print("Successfully turned on busy light.")
-        
-
-    def turn_off_hue_zoom_busy_light(self, gone):
-        
-        if gone:
-            print("Zoom Meeting Window has been closed...")
-
+      
 
     def zoom_status_monitor(self):
 
@@ -99,10 +80,17 @@ class HueBusyLightForZoom():
 
             # if the light isn't on, turn it on
             if busy_light_already_on == False:
-                self.turn_on_hue_zoom_busy_light()
+                # turn on the light
+                try:
+                    response = requests.put(url = f"http://{self.app_settings['hue_bridge_ip']}/api/{self.app_settings['hue_username']}/lights/{self.app_settings['hue_light_id']}/state", json={"on":True, "xy":self.app_settings['zoom_busy_color'] , "bri": self.app_settings['zoom_busy_brightness_level']})
+                except Exception as e:
+                    print(f"Unable to turn on light due to error {e}")
+
+                if response.status_code==200:
+                    print("Successfully turned on busy light.")
 
             # Wait here until we are no longer in the Meeting
-            gone = psutil.wait_procs(zoom_meeting_processes, callback=self.turn_off_hue_zoom_busy_light)
+            gone = psutil.wait_procs(zoom_meeting_processes)
             
             # Now that wait_procs is over, that means we are not in a Meeting anymore. So let's turn off (or revert) the Hue light
             if hue_light_current_state:
@@ -150,7 +138,6 @@ class HueBusyLightforZoomServiceWrapper(win32serviceutil.ServiceFramework):
 
         if self.hbl4z.app_settings['hue_bridge_ip'] == "" or self.hbl4z.app_settings['hue_bridge_ip'] == None or self.hbl4z.app_settings['hue_light_id'] == "" or self.hbl4z.app_settings['hue_light_id'] == None or self.hbl4z.app_settings['hue_username'] == "" or self.hbl4z.app_settings['hue_username'] == None:
             raise RuntimeError("Hue settings are missing from registry. please run GUI for initial setup.")
-
 
         self.isrunning = True
 
