@@ -1,5 +1,7 @@
 # Hue Busy Light for Zoom
-Turn on a hue light based on your Zoom status
+Turn on a hue light based on your Zoom status.
+
+Currently Windows is the only OS supported.
 
 ## Python Script
 1. Install python 3.8
