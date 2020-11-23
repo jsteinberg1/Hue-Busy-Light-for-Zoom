@@ -1,4 +1,2 @@
 theme: jekyll-theme-cayman
-show_downloads:"true"
-github:
-  zip_url: https://github.com/jsteinberg1/Hue-Busy-Light-for-Zoom/releases/download/0.1/Hue.Busy.Light.for.Zoom.zip
+show_downloads: true
