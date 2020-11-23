@@ -1,4 +1,4 @@
-# Hue-Busy-Light-for-Zoom
+# Hue Busy Light for Zoom
 Turn on a hue light based on your Zoom status
 
 ## Python Script
