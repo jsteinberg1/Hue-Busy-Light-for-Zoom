@@ -2,6 +2,10 @@ import winreg
 import psutil
 import requests
 
+# TODO
+'''
+1) If the light has changed from the Zoom busy light to something else (e.g. another color), then don't turn off the light when meeting ends....
+'''
 
 class HueBusyLightForZoom():
     def __init__(self):
@@ -44,7 +48,6 @@ class HueBusyLightForZoom():
             return True
 
         
-    
     def hue_get_current_light_state(self):
         # get current state of light, so we can revert after
         current_light_response = requests.get(url = f"http://{self.app_settings['hue_bridge_ip']}/api/{self.app_settings['hue_username']}/lights/{self.app_settings['hue_light_id']}")
@@ -52,9 +55,8 @@ class HueBusyLightForZoom():
         # Check if the light is already on
         if current_light_response.json()['state']["on"] == True:
             # Light is already on, see if the color value matches the Zoom busy light
-            if current_light_response.json()['state']["xy"] == self.app_settings['zoom_busy_color'] and current_light_response.json()['state']['bri'] == app_settings['zoom_busy_brightness_level']:
+            if current_light_response.json()['state']["xy"] == self.app_settings['zoom_busy_color'] and current_light_response.json()['state']['bri'] == self.app_settings['zoom_busy_brightness_level']:
                 # light is already set to Zoom busy light ( maybe this program crashed? ) so don't save the state
-                print("No need to run on light, already set to Zoom busy status")
                 return None, True
 
             # store settings that are common for both white and color bulbs
@@ -86,7 +88,11 @@ class HueBusyLightForZoom():
         # if we have atleast one Zoom Meeting process (i.e. we are in a meeting now...)
         if zoom_meeting_processes:
             # check the current state of the Hue light
-            hue_light_current_state, busy_light_already_on = self.hue_get_current_light_state()
+            try:
+                hue_light_previous_state, busy_light_already_on = self.hue_get_current_light_state()
+            except Exception as e:
+                print(f"Unable to get current light status {e}")
+                return
 
             # if the light isn't on, turn it on
             if busy_light_already_on == False:
@@ -95,26 +101,45 @@ class HueBusyLightForZoom():
                     response = requests.put(url = f"http://{self.app_settings['hue_bridge_ip']}/api/{self.app_settings['hue_username']}/lights/{self.app_settings['hue_light_id']}/state", json={"on":True, "xy":self.app_settings['zoom_busy_color'] , "bri": self.app_settings['zoom_busy_brightness_level']})
                 except Exception as e:
                     print(f"Unable to turn on light due to error {e}")
+                    return
 
                 if response.status_code==200:
                     print("Successfully turned on busy light.")
+                else:
+                    return
+            else:
+                print("Busy light is already on, no need to turn it on again...")
 
             # Wait here until we are no longer in the Meeting
             gone = psutil.wait_procs(zoom_meeting_processes)
             
-            # Now that wait_procs is over, that means we are not in a Meeting anymore. So let's turn off (or revert) the Hue light
-            if hue_light_current_state:
+            # Now that wait_procs is over, that means we are not in a Meeting anymore. So let's turn off (or revert) the Busy Light
+
+            try:
+                hue_light_current_state, busy_light_already_on = self.hue_get_current_light_state()
+            except Exception as e:
+                print(f"Unable to get current light status3 {e}")
+                return
+                        
+            if hue_light_previous_state and busy_light_already_on:
                 # we have a previous state for the light, so let's change the light back to the previous color before Zoom Busy light turned on..
-                try:
-                    response = requests.put(url = f"http://{self.app_settings['hue_bridge_ip']}/api/{self.app_settings['hue_username']}/lights/{self.app_settings['hue_light_id']}/state", json=hue_light_current_state)
-                except Exception as e:
-                    logging.error(f"Unable to turn off light due to error {e}")
-            else:
+                json_payload_for_hue_light_change = hue_light_previous_state
+
+            elif busy_light_already_on:               
                 # light was not on before Zoom busy light, so just turn off
-                try:
-                    response = requests.put(url = f"http://{self.app_settings['hue_bridge_ip']}/api/{self.app_settings['hue_username']}/lights/{self.app_settings['hue_light_id']}/state", json={"on":False})
-                except Exception as e:
-                    logging.error(f"Unable to turn off light due to error {e}")
+                json_payload_for_hue_light_change = {"on":False}
             
-            if response.status_code==200:
+            else:
+                print("Busy light is already off, no need to turn it off..")
+                return
+            
+            # apply change to Hue Bridge
+            try:
+                response = requests.put(url = f"http://{self.app_settings['hue_bridge_ip']}/api/{self.app_settings['hue_username']}/lights/{self.app_settings['hue_light_id']}/state", json=json_payload_for_hue_light_change)
+            except Exception as e:
+                logging.error(f"Unable to apply light command {json_payload_for_hue_light_change} due to error {e}")
+            else:
                 print("Successfully turned off busy light.")
+            
+
+            
